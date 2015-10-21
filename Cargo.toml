@@ -2,3 +2,12 @@
 name = "hashindexed"
 version = "0.1.0"
 authors = ["Diggory Hardy <git@dhardy.name>"]
+
+description = "A cache. A set which compares elements in a customisable way without overriding the eq() and hash() functions on the type itself."
+
+homepage = "https://github.com/dhardy/hashindexed"
+repository = "https://github.com/dhardy/hashindexed"
+
+readme = "README.md"
+keywords = ["HashSet", "cache"]
+license = "MIT"
