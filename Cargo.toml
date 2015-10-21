@@ -1,0 +1,4 @@
+[package]
+name = "hashindexed"
+version = "0.1.0"
+authors = ["Diggory Hardy <git@dhardy.name>"]
