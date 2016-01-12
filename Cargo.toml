@@ -9,5 +9,5 @@ homepage = "https://github.com/dhardy/hashindexed"
 repository = "https://github.com/dhardy/hashindexed"
 
 readme = "README.md"
-keywords = ["HashSet", "cache"]
+keywords = ["HashSet", "cache", "set", "map", "collection", "hash", "indexed"]
 license = "MIT"

@@ -1,9 +1,9 @@
-// Copyright 2015 by the authors mentioned in the LICENCE file
-// found at the top-level directory of this distribution.
+// Copyright 2016 hashindexed Developers
 //
-// Licensed under the MIT licence <LICENCE file or
-// http://opensource.org/licenses/MIT>. This file may not be copied,
-// modified, or distributed except according to those terms.
+// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
+// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
+// http://opensource.org/licenses/MIT>, at your option. This file may not be
+// copied, modified, or distributed except according to those terms.
 
 //! Store a set of values in a data structure indexed by the hash of some
 //! user-defined sub-property.
