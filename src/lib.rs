@@ -32,14 +32,16 @@ use std::fmt;
 /// 
 /// Note that `contains()`, `get()`, `replace()` and `remove()` require
 /// implementation of `extract_key()` in order to function correctly!
-pub trait KeyComparator<T, K> where K: Eq + Hash {
+pub trait KeyComparator<T> {
+    type K: Eq + Hash;
+    
     /// This function should return a key extracted from the value.
     /// `eq` and `hash` are implemented on this key.
     /// 
     /// Note that the implementation could simply panic if `key_eq()` and
     /// `key_hash()` are implemented instead; however some functions
     /// will not work in this case.
-    fn extract_key(value: &T) -> &K;
+    fn extract_key(value: &T) -> &Self::K;
     
     /// Test equality of keys extracted from given values u, v.
     fn key_eq(u: &T, v: &T) -> bool {
@@ -53,38 +55,34 @@ pub trait KeyComparator<T, K> where K: Eq + Hash {
 }
 
 /// Internal type
-pub struct IndexableValue<T, K, E> {
-    phantom_k: PhantomData<K>,
+pub struct IndexableValue<T, E> {
     phantom_e: PhantomData<E>,
     value: T
 }
-impl<T, K, E> IndexableValue<T, K, E> {
-    fn new(value: T) -> IndexableValue<T, K, E> {
+impl<T, E> IndexableValue<T, E> {
+    fn new(value: T) -> IndexableValue<T, E> {
         IndexableValue {
-            phantom_k: PhantomData,
             phantom_e: PhantomData,
             value: value
         }
     }
 }
 
-impl<T, K, E> PartialEq<IndexableValue<T, K, E>> for IndexableValue<T, K, E>
-    where E: KeyComparator<T, K>, K: Eq + Hash
+impl<T, E> PartialEq<IndexableValue<T, E>> for IndexableValue<T, E>
+    where E: KeyComparator<T>
 {
-    fn eq(&self, other: &IndexableValue<T, K, E>) -> bool {
+    fn eq(&self, other: &IndexableValue<T, E>) -> bool {
         E::key_eq(&self.value, &other.value)
     }
 }
-impl<T, K, E> Eq for IndexableValue<T, K, E> where E: KeyComparator<T, K>, K: Eq + Hash {}
-impl<T, K, E> Hash for IndexableValue<T, K, E> where E: KeyComparator<T, K>, K: Eq + Hash {
+impl<T, E> Eq for IndexableValue<T, E> where E: KeyComparator<T> {}
+impl<T, E> Hash for IndexableValue<T, E> where E: KeyComparator<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         E::key_hash(&self.value, state)
     }
 }
-impl<T, K, E> Borrow<K> for IndexableValue<T, K, E>
-    where E: KeyComparator<T, K>, K: Eq + Hash
-{
-    fn borrow(&self) -> &K {
+impl<T, E> Borrow<E::K> for IndexableValue<T, E> where E: KeyComparator<T> {
+    fn borrow(&self) -> &E::K {
         E::extract_key(&self.value)
     }
 }
@@ -101,11 +99,12 @@ impl<T, K, E> Borrow<K> for IndexableValue<T, K, E>
 /// struct MyType { num: i32, name: &'static str }
 /// 
 /// struct MyComparator;
-/// impl KeyComparator<MyType, i32> for MyComparator {
+/// impl KeyComparator<MyType> for MyComparator {
+///     type K = i32;
 ///     fn extract_key(v: &MyType) -> &i32 { &v.num }
 /// }
 /// 
-/// let mut container: HashIndexed<MyType, i32, MyComparator> =
+/// let mut container: HashIndexed<MyType, MyComparator> =
 ///     HashIndexed::new();
 /// 
 /// container.insert(MyType { num: 1, name: "one" });
@@ -121,22 +120,22 @@ impl<T, K, E> Borrow<K> for IndexableValue<T, K, E>
 /// container.replace(MyType { num: 3, name: "THREE" });
 /// assert_eq!( container.get(&3).unwrap().name, "THREE" );
 /// ```
-pub struct HashIndexed<T, K, E> {
-    set: HashSet<IndexableValue<T, K, E>>
+pub struct HashIndexed<T, E> {
+    set: HashSet<IndexableValue<T, E>>
 }
 
-impl<T, K, E> HashIndexed<T, K, E>
-    where E: KeyComparator<T, K>, K: Eq + Hash,
-    IndexableValue<T, K, E>: Borrow<K>
+impl<T, E> HashIndexed<T, E>
+    where E: KeyComparator<T>,
+    IndexableValue<T, E>: Borrow<E::K>
 {
     /// Creates an empty HashIndexed collection.
-    pub fn new() -> HashIndexed<T, K, E> {
+    pub fn new() -> HashIndexed<T, E> {
         HashIndexed { set: HashSet::new() }
     }
     
     /// Creates an empty HashIndexed with space for at least `capacity`
     /// elements in the hash table.
-    pub fn with_capacity(capacity: usize) -> HashIndexed<T, K, E> {
+    pub fn with_capacity(capacity: usize) -> HashIndexed<T, E> {
         HashIndexed { set: HashSet::with_capacity(capacity) }
     }
     
@@ -166,14 +165,14 @@ impl<T, K, E> HashIndexed<T, K, E>
     }
     
     /// An iterator visiting all elements in arbitrary order.
-    pub fn iter(&self) -> Iter<T, K, E> {
+    pub fn iter(&self) -> Iter<T, E> {
         Iter { iter: self.set.iter() }
     }
 
     /// Creates a consuming iterator, that is, one that moves each value out
     /// of the set in arbitrary order. The set cannot be used after calling
     /// this.
-    pub fn into_iter(self) -> IntoIter<T, K, E> {
+    pub fn into_iter(self) -> IntoIter<T, E> {
         IntoIter { iter: self.set.into_iter() }
     }
     
@@ -188,11 +187,11 @@ impl<T, K, E> HashIndexed<T, K, E>
     
     /// Returns `true` if the collection contains a value matching the given
     /// key.
-    pub fn contains(&self, k: &K) -> bool {
+    pub fn contains(&self, k: &E::K) -> bool {
         self.set.contains(k)
     }
     /// Returns a reference to the value corresponding to the key.
-    pub fn get(&self, k: &K) -> Option<&T> {
+    pub fn get(&self, k: &E::K) -> Option<&T> {
         self.set.get(k).map(|v| &v.value)
     }
     
@@ -213,7 +212,7 @@ impl<T, K, E> HashIndexed<T, K, E>
     
     /// Removes and returns the value in the collection, if any, that is equal
     /// to the given one.
-    pub fn remove(&mut self, k: &K) -> Option<T> {
+    pub fn remove(&mut self, k: &E::K) -> Option<T> {
         // Note that 'take' in HashSet corresponds to 'remove' for values in
         // HashMap; this is because it was added after API stabilisation of the
         // existing 'remove' function.
@@ -221,20 +220,20 @@ impl<T, K, E> HashIndexed<T, K, E>
     }
 }
 
-impl<T, K, E> PartialEq for HashIndexed<T, K, E>
-    where HashSet<IndexableValue<T, K, E>>: PartialEq
+impl<T, E> PartialEq for HashIndexed<T, E>
+    where HashSet<IndexableValue<T, E>>: PartialEq
 {
-    fn eq(&self, other: &HashIndexed<T, K, E>) -> bool {
+    fn eq(&self, other: &HashIndexed<T, E>) -> bool {
         self.set == other.set
     }
 }
 
-impl<T, K, E> Eq for HashIndexed<T, K, E>
-    where HashIndexed<T, K, E>: PartialEq
+impl<T, E> Eq for HashIndexed<T, E>
+    where HashIndexed<T, E>: PartialEq
 {}
 
-impl<T, K, E> fmt::Debug for HashIndexed<T, K, E>
-    where HashSet<IndexableValue<T, K, E>>: fmt::Debug
+impl<T, E> fmt::Debug for HashIndexed<T, E>
+    where HashSet<IndexableValue<T, E>>: fmt::Debug
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.set.fmt(f)
@@ -242,52 +241,49 @@ impl<T, K, E> fmt::Debug for HashIndexed<T, K, E>
 }
 
 /// HashIndexed iterator
-pub struct Iter<'a, T: 'a, K: 'a, E: 'a> {
-    iter: hash_set::Iter<'a, IndexableValue<T, K, E>>
+pub struct Iter<'a, T: 'a, E: 'a> {
+    iter: hash_set::Iter<'a, IndexableValue<T, E>>
 }
 
 /// HashIndexed move iterator
-pub struct IntoIter<T, K, E> {
-    iter: hash_set::IntoIter<IndexableValue<T, K, E>>
+pub struct IntoIter<T, E> {
+    iter: hash_set::IntoIter<IndexableValue<T, E>>
 }
 
-impl<'a, T, K, E> IntoIterator for &'a HashIndexed<T, K, E>
-    where K: Eq + Hash, E: KeyComparator<T, K>,
-    IndexableValue<T, K, E>: Borrow<K>
+impl<'a, T, E> IntoIterator for &'a HashIndexed<T, E>
+    where E: KeyComparator<T>, IndexableValue<T, E>: Borrow<E::K>
 {
     type Item = &'a T;
-    type IntoIter = Iter<'a, T, K, E>;
-    fn into_iter(self) -> Iter<'a, T, K, E> {
+    type IntoIter = Iter<'a, T, E>;
+    fn into_iter(self) -> Iter<'a, T, E> {
         self.iter()
     }
 }
 
-impl<'a, T, K, E> IntoIterator for HashIndexed<T, K, E>
-    where K: Eq + Hash, E: KeyComparator<T, K>
-{
+impl<'a, T, E> IntoIterator for HashIndexed<T, E> where E: KeyComparator<T> {
     type Item = T;
-    type IntoIter = IntoIter<T, K, E>;
-    fn into_iter(self) -> IntoIter<T, K, E> {
-        self.into_iter()
+    type IntoIter = IntoIter<T, E>;
+    fn into_iter(self) -> IntoIter<T, E> {
+        IntoIter { iter: self.set.into_iter() }
     }
 }
 
-impl<'a, T, K, E> Iterator for Iter<'a, T, K, E> {
+impl<'a, T, E> Iterator for Iter<'a, T, E> {
     type Item = &'a T;
     
     fn next(&mut self) -> Option<&'a T> { self.iter.next().map(|x| &x.value) }
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
-impl<'a, T, K, E> ExactSizeIterator for Iter<'a, T, K, E> {
+impl<'a, T, E> ExactSizeIterator for Iter<'a, T, E> {
     fn len(&self) -> usize { self.iter.len() }
 }
 
-impl<T, K, E> Iterator for IntoIter<T, K, E> {
+impl<T, E> Iterator for IntoIter<T, E> {
     type Item = T;
 
     fn next(&mut self) -> Option<T> { self.iter.next().map(|x| x.value) }
     fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
-impl<T, K, E> ExactSizeIterator for IntoIter<T, K, E> {
+impl<T, E> ExactSizeIterator for IntoIter<T, E> {
     fn len(&self) -> usize { self.iter.len() }
 }
