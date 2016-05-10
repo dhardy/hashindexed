@@ -1,6 +1,6 @@
 [package]
 name = "hashindexed"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Diggory Hardy <git@dhardy.name>"]
 
 description = "A cache. A set which compares elements in a customisable way without overriding the eq() and hash() functions on the type itself."

@@ -14,9 +14,6 @@
 //! 
 //! See [`HashIndexed`](struct.HashIndexed.html) type for usage.
 
-// Required for get(); will hopefully be stable soon
-#![feature(set_recovery)]
-
 use std::collections::HashSet;
 use std::collections::hash_set;
 use std::hash::{Hash, Hasher};
